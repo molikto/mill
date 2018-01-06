@@ -1,6 +1,6 @@
 package mill.main
 
-import mill.discover.Mirror
+import mill.discover.Mirror.Segment.{Cross, Label}
 import utest._
 
 object ParseArgsTest extends TestSuite {
@@ -9,28 +9,44 @@ object ParseArgsTest extends TestSuite {
 
   val singleSelector = Seq("core.compile")
 
-  val singleSelectorWithCross = Seq("bridges[2.12,jvm].compile")
+  val singleSelectorWithCross = Seq("bridges[2.12.4,jvm].compile")
 
   val singleSelectorWithArgs = Seq("application.run", "hello", "world")
 
-  val multiSelectorsAll =
+  val singleSelectorWithAllInArgs =
+    Seq("application.run", "hello", "world", "--all")
+
+  val multiSelectors =
     Seq("--all", "core.jar", "core.docsJar", "core.sourcesJar")
 
   val multiSelectorsSeq =
     Seq("--seq", "core.jar", "core.docsJar", "core.sourcesJar")
 
-  val multiSelectorsWithArgsAll = Seq("--all",
-                                      "core.compile",
-                                      "application.runMain",
-                                      "--",
-                                      "Main",
-                                      "hello",
-                                      "world")
+  val multiSelectorsWithArgs = Seq("--all",
+                                   "core.compile",
+                                   "application.runMain",
+                                   "--",
+                                   "Main",
+                                   "hello",
+                                   "world")
+
+  val multiSelectorsWithArgsWithAllInArgs = Seq("--all",
+                                                "core.compile",
+                                                "application.runMain",
+                                                "--",
+                                                "Main",
+                                                "--all",
+                                                "world")
+
+  val multiSelectorsBraceExpansionWithoutAll = Seq("{core,application}.compile")
 
   val multiSelectorsBraceExpansion = Seq("--all", "{core,application}.compile")
 
   val multiSelectorsBraceExpansionWithCross =
-    Seq("--all", "bridges[2.12,jvm].{test,jar}")
+    Seq("--all", "bridges[2.12.4,jvm].{test,jar}")
+
+  val multiSelectorsBraceExpansionInsideCross =
+    Seq("--all", "bridges[{2.11.11,2.11.8}].jar")
 
   val multiSelectorsBraceExpansionWithArgs =
     Seq("--all", "{core,application}.run", "--", "hello", "world")
@@ -38,62 +54,89 @@ object ParseArgsTest extends TestSuite {
   val tests = Tests {
     'extractSelsAndArgs - {
       'empty - {
-        val (selectors, args) = ParseArgs.extractSelsAndArgs(emptyArgs)
+        val (selectors, args, isMulti) = ParseArgs.extractSelsAndArgs(emptyArgs)
 
         assert(
           selectors.isEmpty,
-          args.isEmpty
+          args.isEmpty,
+          !isMulti
         )
       }
       'singleSelector - {
-        val (selectors, args) =
+        val (selectors, args, isMulti) =
           ParseArgs.extractSelsAndArgs(singleSelector)
 
         assert(
           selectors == singleSelector,
-          args.isEmpty
+          args.isEmpty,
+          !isMulti
         )
       }
       'singleSelectorWithArgs - {
-        val (selectors, args) =
+        val (selectors, args, isMulti) =
           ParseArgs.extractSelsAndArgs(singleSelectorWithArgs)
 
         assert(
           selectors == Seq("application.run"),
-          args == Seq("hello", "world")
+          args == Seq("hello", "world"),
+          !isMulti
         )
       }
-      'multiSelectorsAll - {
-        val (selectors, args) =
-          ParseArgs.extractSelsAndArgs(multiSelectorsAll)
+      'singleSelectorWithAllInArgs - {
+        val (selectors, args, isMulti) =
+          ParseArgs.extractSelsAndArgs(singleSelectorWithAllInArgs)
+
+        assert(
+          selectors == Seq("application.run"),
+          args == Seq("hello", "world", "--all"),
+          !isMulti
+        )
+      }
+      'multiSelectors - {
+        val (selectors, args, isMulti) =
+          ParseArgs.extractSelsAndArgs(multiSelectors)
 
         assert(
           !selectors.contains("--all"),
           selectors == Seq("core.jar", "core.docsJar", "core.sourcesJar"),
-          args.isEmpty
+          args.isEmpty,
+          isMulti
         )
       }
       'multiSelectorsSeq - {
-        val (selectors, args) =
+        val (selectors, args, isMulti) =
           ParseArgs.extractSelsAndArgs(multiSelectorsSeq)
 
         assert(
           !selectors.contains("--seq"),
           selectors == Seq("core.jar", "core.docsJar", "core.sourcesJar"),
-          args.isEmpty
+          args.isEmpty,
+          isMulti
         )
       }
-      'multiSelectorsWithArgsAll - {
-        val (selectors, args) =
-          ParseArgs.extractSelsAndArgs(multiSelectorsWithArgsAll)
+      'multiSelectorsWithArgs - {
+        val (selectors, args, isMulti) =
+          ParseArgs.extractSelsAndArgs(multiSelectorsWithArgs)
 
         assert(
           !selectors.contains("--all"),
           selectors == Seq("core.compile", "application.runMain"),
           !args.contains("--"),
-          args == Seq("Main", "hello", "world")
+          args == Seq("Main", "hello", "world"),
+          isMulti
         )
+      }
+      'multiSelectorsWithArgsWithAllInArgs - {
+        val (selectors, args, isMulti) =
+          ParseArgs.extractSelsAndArgs(multiSelectorsWithArgsWithAllInArgs)
 
+        assert(
+          !selectors.contains("--all"),
+          selectors == Seq("core.compile", "application.runMain"),
+          !args.contains("--"),
+          args == Seq("Main", "--all", "world"),
+          isMulti
+        )
       }
     }
     'expandBraces - {
@@ -131,6 +174,13 @@ object ParseArgsTest extends TestSuite {
             "application.jar",
             "application.docsJar"
           )
+        )
+      }
+      'expandNested - {
+        val Right(expanded) = ParseArgs.expandBraces("{hello,world.{cow,moo}}")
+
+        assert(
+          expanded == List("hello", "world.cow", "world.moo")
         )
       }
       'expandMixed - {
@@ -193,10 +243,7 @@ object ParseArgsTest extends TestSuite {
           ParseArgs(singleSelector)
         assert(
           selectors == List(
-            List(
-              Mirror.Segment.Label("core"),
-              Mirror.Segment.Label("compile")
-            )
+            List(Label("core"), Label("compile"))
           ),
           args.isEmpty
         )
@@ -206,10 +253,7 @@ object ParseArgsTest extends TestSuite {
           ParseArgs(singleSelectorWithArgs)
         assert(
           selectors == List(
-            List(
-              Mirror.Segment.Label("application"),
-              Mirror.Segment.Label("run")
-            )
+            List(Label("application"), Label("run"))
           ),
           args == Seq("hello", "world")
         )
@@ -219,12 +263,7 @@ object ParseArgsTest extends TestSuite {
           ParseArgs(singleSelectorWithCross)
         assert(
           selectors == List(
-            List(
-              Mirror.Segment.Label("bridges"),
-              Mirror.Segment.Cross(Seq("2.12", "jvm")),
-              Mirror.Segment.Label("compile")
-            )
-          ),
+            List(Label("bridges"), Cross(Seq("2.12.4", "jvm")), Label("compile"))),
           args.isEmpty
         )
       }
@@ -234,14 +273,8 @@ object ParseArgsTest extends TestSuite {
 
         assert(
           selectors == List(
-            List(
-              Mirror.Segment.Label("core"),
-              Mirror.Segment.Label("compile")
-            ),
-            List(
-              Mirror.Segment.Label("application"),
-              Mirror.Segment.Label("compile")
-            )
+            List(Label("core"), Label("compile")),
+            List(Label("application"), Label("compile"))
           ),
           args.isEmpty
         )
@@ -252,14 +285,8 @@ object ParseArgsTest extends TestSuite {
 
         assert(
           selectors == List(
-            List(
-              Mirror.Segment.Label("core"),
-              Mirror.Segment.Label("run")
-            ),
-            List(
-              Mirror.Segment.Label("application"),
-              Mirror.Segment.Label("run")
-            )
+            List(Label("core"), Label("run")),
+            List(Label("application"), Label("run"))
           ),
           args == Seq("hello", "world")
         )
@@ -270,19 +297,29 @@ object ParseArgsTest extends TestSuite {
 
         assert(
           selectors == List(
-            List(
-              Mirror.Segment.Label("bridges"),
-              Mirror.Segment.Cross(Seq("2.12", "jvm")),
-              Mirror.Segment.Label("test")
-            ),
-            List(
-              Mirror.Segment.Label("bridges"),
-              Mirror.Segment.Cross(Seq("2.12", "jvm")),
-              Mirror.Segment.Label("jar")
-            )
+            List(Label("bridges"), Cross(Seq("2.12.4", "jvm")), Label("test")),
+            List(Label("bridges"), Cross(Seq("2.12.4", "jvm")), Label("jar"))
           ),
           args.isEmpty
         )
+      }
+      'multiSelectorsBraceExpansionInsideCross - {
+        val Right((selectors, args)) =
+          ParseArgs(multiSelectorsBraceExpansionInsideCross)
+
+        assert(
+          selectors == List(
+            List(Label("bridges"), Cross(Seq("2.11.11")), Label("jar")),
+            List(Label("bridges"), Cross(Seq("2.11.8")), Label("jar"))
+          ),
+          args.isEmpty
+        )
+      }
+      'multiSelectorsBraceExpansionWithoutAll - {
+        val Left(error) =
+          ParseArgs(multiSelectorsBraceExpansionWithoutAll)
+
+        assert(error.contains("Parsing exception"))
       }
     }
   }

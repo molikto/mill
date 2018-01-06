@@ -8,28 +8,35 @@ object ParseArgs {
 
   def apply(scriptArgs: Seq[String])
     : Either[String, (List[List[Mirror.Segment]], Seq[String])] = {
-    val (selectorStrings, args) = extractSelsAndArgs(scriptArgs)
+    val (selectorStrings, args, isMultiSelectors) =
+      extractSelsAndArgs(scriptArgs)
     for {
       _ <- validateSelectors(selectorStrings)
-      expandedSelectors <- EitherOps
-        .sequence(selectorStrings.map(expandBraces))
-        .map(_.flatten)
+      expandedSelectors <- if (isMultiSelectors) {
+        EitherOps
+          .sequence(selectorStrings.map(expandBraces))
+          .map(_.flatten)
+      } else {
+        Right(selectorStrings)
+      }
       selectors <- EitherOps.sequence(expandedSelectors.map(extractSegments))
     } yield (selectors.toList, args)
   }
 
   def extractSelsAndArgs(
-      scriptArgs: Seq[String]): (Seq[String], Seq[String]) = {
+      scriptArgs: Seq[String]): (Seq[String], Seq[String], Boolean) = {
     val multiFlags = Seq("--all", "--seq")
-    val isMultiSelectors = scriptArgs.exists(multiFlags.contains)
+    val isMultiSelectors = scriptArgs.headOption.exists(multiFlags.contains)
 
     if (isMultiSelectors) {
-      val filtered = scriptArgs.filterNot(multiFlags.contains)
-      val dd = filtered.indexOf("--")
-      if (dd == -1) filtered -> Seq.empty
-      else filtered.take(dd) -> filtered.drop(dd + 1)
+      val dd = scriptArgs.indexOf("--")
+      val selectors = (if (dd == -1) scriptArgs
+                       else scriptArgs.take(dd)).filterNot(multiFlags.contains)
+      val args = if (dd == -1) Seq.empty else scriptArgs.drop(dd + 1)
+
+      (selectors, args, isMultiSelectors)
     } else {
-      scriptArgs.take(1) -> scriptArgs.drop(1)
+      (scriptArgs.take(1), scriptArgs.drop(1), isMultiSelectors)
     }
   }
 
@@ -69,7 +76,7 @@ object ParseArgs {
       P("{" ~ CharsWhile(c => c != ',' && c != '}').rep ~ "}").!.map(
         Fragment.Keep)
 
-    val other = P(CharsWhile(c => c != '{')).!.map(Fragment.Keep)
+    val other = P(CharsWhile(c => c != '{' && c != '}')).!.map(Fragment.Keep)
 
     val split = (containBraces | braceExpansion | other).rep
 
