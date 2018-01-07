@@ -1,198 +1,114 @@
 package mill.main
 
+import mill.discover.Mirror.Segment
 import mill.discover.Mirror.Segment.{Cross, Label}
 import utest._
 
 object ParseArgsTest extends TestSuite {
 
-  val emptyArgs = Seq.empty[String]
-
-  val singleSelector = Seq("core.compile")
-
-  val singleSelectorWithCross = Seq("bridges[2.12.4,jvm].compile")
-
-  val singleSelectorWithArgs = Seq("application.run", "hello", "world")
-
-  val singleSelectorWithAllInArgs =
-    Seq("application.run", "hello", "world", "--all")
-
-  val multiSelectors =
-    Seq("--all", "core.jar", "core.docsJar", "core.sourcesJar")
-
-  val multiSelectorsSeq =
-    Seq("--seq", "core.jar", "core.docsJar", "core.sourcesJar")
-
-  val multiSelectorsWithArgs = Seq("--all",
-                                   "core.compile",
-                                   "application.runMain",
-                                   "--",
-                                   "Main",
-                                   "hello",
-                                   "world")
-
-  val multiSelectorsWithArgsWithAllInArgs = Seq("--all",
-                                                "core.compile",
-                                                "application.runMain",
-                                                "--",
-                                                "Main",
-                                                "--all",
-                                                "world")
-
-  val multiSelectorsBraceExpansionWithoutAll = Seq("{core,application}.compile")
-
-  val multiSelectorsBraceExpansion = Seq("--all", "{core,application}.compile")
-
-  val multiSelectorsBraceExpansionWithCross =
-    Seq("--all", "bridges[2.12.4,jvm].{test,jar}")
-
-  val multiSelectorsBraceExpansionInsideCross =
-    Seq("--all", "bridges[{2.11.11,2.11.8}].jar")
-
-  val multiSelectorsBraceExpansionWithArgs =
-    Seq("--all", "{core,application}.run", "--", "hello", "world")
-
   val tests = Tests {
     'extractSelsAndArgs - {
-      'empty - {
-        val (selectors, args, isMulti) = ParseArgs.extractSelsAndArgs(emptyArgs)
+      def check(input: Seq[String],
+                expectedSelectors: Seq[String],
+                expectedArgs: Seq[String],
+                expectedIsMulti: Boolean) = {
+        val (selectors, args, isMulti) = ParseArgs.extractSelsAndArgs(input)
 
         assert(
-          selectors.isEmpty,
-          args.isEmpty,
-          !isMulti
+          selectors == expectedSelectors,
+          args == expectedArgs,
+          isMulti == expectedIsMulti
         )
       }
-      'singleSelector - {
-        val (selectors, args, isMulti) =
-          ParseArgs.extractSelsAndArgs(singleSelector)
 
-        assert(
-          selectors == singleSelector,
-          args.isEmpty,
-          !isMulti
-        )
-      }
-      'singleSelectorWithArgs - {
-        val (selectors, args, isMulti) =
-          ParseArgs.extractSelsAndArgs(singleSelectorWithArgs)
-
-        assert(
-          selectors == Seq("application.run"),
-          args == Seq("hello", "world"),
-          !isMulti
-        )
-      }
-      'singleSelectorWithAllInArgs - {
-        val (selectors, args, isMulti) =
-          ParseArgs.extractSelsAndArgs(singleSelectorWithAllInArgs)
-
-        assert(
-          selectors == Seq("application.run"),
-          args == Seq("hello", "world", "--all"),
-          !isMulti
-        )
-      }
-      'multiSelectors - {
-        val (selectors, args, isMulti) =
-          ParseArgs.extractSelsAndArgs(multiSelectors)
-
-        assert(
-          !selectors.contains("--all"),
-          selectors == Seq("core.jar", "core.docsJar", "core.sourcesJar"),
-          args.isEmpty,
-          isMulti
-        )
-      }
-      'multiSelectorsSeq - {
-        val (selectors, args, isMulti) =
-          ParseArgs.extractSelsAndArgs(multiSelectorsSeq)
-
-        assert(
-          !selectors.contains("--seq"),
-          selectors == Seq("core.jar", "core.docsJar", "core.sourcesJar"),
-          args.isEmpty,
-          isMulti
-        )
-      }
-      'multiSelectorsWithArgs - {
-        val (selectors, args, isMulti) =
-          ParseArgs.extractSelsAndArgs(multiSelectorsWithArgs)
-
-        assert(
-          !selectors.contains("--all"),
-          selectors == Seq("core.compile", "application.runMain"),
-          !args.contains("--"),
-          args == Seq("Main", "hello", "world"),
-          isMulti
-        )
-      }
-      'multiSelectorsWithArgsWithAllInArgs - {
-        val (selectors, args, isMulti) =
-          ParseArgs.extractSelsAndArgs(multiSelectorsWithArgsWithAllInArgs)
-
-        assert(
-          !selectors.contains("--all"),
-          selectors == Seq("core.compile", "application.runMain"),
-          !args.contains("--"),
-          args == Seq("Main", "--all", "world"),
-          isMulti
-        )
-      }
+      'empty - check(Seq.empty, Seq.empty, Seq.empty, false)
+      'singleSelector - check(
+        input = Seq("core.compile"),
+        expectedSelectors = Seq("core.compile"),
+        expectedArgs = Seq.empty,
+        expectedIsMulti = false
+      )
+      'singleSelectorWithArgs - check(
+        input = Seq("application.run", "hello", "world"),
+        expectedSelectors = Seq("application.run"),
+        expectedArgs = Seq("hello", "world"),
+        expectedIsMulti = false
+      )
+      'singleSelectorWithAllInArgs - check(
+        input = Seq("application.run", "hello", "world", "--all"),
+        expectedSelectors = Seq("application.run"),
+        expectedArgs = Seq("hello", "world", "--all"),
+        expectedIsMulti = false
+      )
+      'multiSelectors - check(
+        input = Seq("--all", "core.jar", "core.docsJar", "core.sourcesJar"),
+        expectedSelectors = Seq("core.jar", "core.docsJar", "core.sourcesJar"),
+        expectedArgs = Seq.empty,
+        expectedIsMulti = true
+      )
+      'multiSelectorsSeq - check(
+        input = Seq("--seq", "core.jar", "core.docsJar", "core.sourcesJar"),
+        expectedSelectors = Seq("core.jar", "core.docsJar", "core.sourcesJar"),
+        expectedArgs = Seq.empty,
+        expectedIsMulti = true
+      )
+      'multiSelectorsWithArgs - check(
+        input = Seq("--all",
+                    "core.compile",
+                    "application.runMain",
+                    "--",
+                    "Main",
+                    "hello",
+                    "world"),
+        expectedSelectors = Seq("core.compile", "application.runMain"),
+        expectedArgs = Seq("Main", "hello", "world"),
+        expectedIsMulti = true
+      )
+      'multiSelectorsWithArgsWithAllInArgs - check(
+        input = Seq("--all",
+                    "core.compile",
+                    "application.runMain",
+                    "--",
+                    "Main",
+                    "--all",
+                    "world"),
+        expectedSelectors = Seq("core.compile", "application.runMain"),
+        expectedArgs = Seq("Main", "--all", "world"),
+        expectedIsMulti = true
+      )
     }
     'expandBraces - {
-      'expandLeft - {
-        val expandLeft = "{application,core}.compile"
-        val Right(expanded) = ParseArgs.expandBraces(expandLeft)
+      def check(input: String, expectedExpansion: List[String]) = {
+        val Right(expanded) = ParseArgs.expandBraces(input)
 
-        assert(
-          expanded == List(
-            "application.compile",
-            "core.compile"
-          )
-        )
+        assert(expanded == expectedExpansion)
       }
-      'expandRight - {
-        val expandRight = "application.{jar,docsJar,sourcesJar}"
-        val Right(expanded) = ParseArgs.expandBraces(expandRight)
 
-        assert(
-          expanded == List(
-            "application.jar",
-            "application.docsJar",
-            "application.sourcesJar"
-          )
+      'expandLeft - check(
+        "{application,core}.compile",
+        List("application.compile", "core.compile")
+      )
+      'expandRight - check(
+        "application.{jar,docsJar,sourcesJar}",
+        List("application.jar", "application.docsJar", "application.sourcesJar")
+      )
+      'expandBoth - check(
+        "{core,application}.{jar,docsJar}",
+        List(
+          "core.jar",
+          "core.docsJar",
+          "application.jar",
+          "application.docsJar"
         )
-      }
-      'expandBoth - {
-        val expandBoth = "{core,application}.{jar,docsJar}"
-        val Right(expanded) = ParseArgs.expandBraces(expandBoth)
-
-        assert(
-          expanded == List(
-            "core.jar",
-            "core.docsJar",
-            "application.jar",
-            "application.docsJar"
-          )
-        )
-      }
-      'expandNested - {
-        val Right(expanded) = ParseArgs.expandBraces("{hello,world.{cow,moo}}")
-
-        assert(
-          expanded == List("hello", "world.cow", "world.moo")
-        )
-      }
-      'expandMixed - {
-        val Right(expanded) = ParseArgs.expandBraces("{a,b}.{c}.{}.e")
-
-        assert(
-          expanded == List(
-            "a.{c}.{}.e",
-            "b.{c}.{}.e"
-          )
-        )
-      }
+      )
+//      'expandNested - check(
+//        "{hello,world.{cow,moo}}",
+//        List("hello", "world.cow", "world.moo")
+//      )
+      'expandMixed - check(
+        "{a,b}.{c}.{}.e",
+        List("a.{c}.{}.e", "b.{c}.{}.e")
+      )
       'malformed - {
         val malformed = Seq("core.{compile", "core.{compile,test]")
 
@@ -202,138 +118,101 @@ object ParseArgsTest extends TestSuite {
         }
       }
       'dontExpand - {
-        val dontExpand = Seq("core.compile", "{}.compile", "{core}.compile")
-
-        dontExpand.foreach { ex =>
-          val Right(result) = ParseArgs.expandBraces(ex)
-          assert(
-            result == List(ex)
-          )
-        }
+        check("core.compile", List("core.compile"))
+        check("{}.compile", List("{}.compile"))
+        check("{core}.compile", List("{core}.compile"))
       }
       'keepUnknownSymbols - {
-        val expected = Seq(
-          "{a,b}.e<>" -> List("a.e<>", "b.e<>"),
-          "a[99]&&" -> List("a[99]&&"),
-          "{a,b}.<%%>.{c,d}" -> List(
-            "a.<%%>.c",
-            "a.<%%>.d",
-            "b.<%%>.c",
-            "b.<%%>.d"
-          )
+        check("{a,b}.e<>", List("a.e<>", "b.e<>"))
+        check("a[99]&&", List("a[99]&&"))
+        check(
+          "{a,b}.<%%>.{c,d}",
+          List("a.<%%>.c", "a.<%%>.d", "b.<%%>.c", "b.<%%>.d")
         )
-
-        expected.foreach {
-          case (in, expectedOut) =>
-            val Right(out) = ParseArgs.expandBraces(in)
-            assert(
-              out == expectedOut
-            )
-        }
       }
     }
 
     'apply - {
+      def check(input: Seq[String],
+                expectedSelectors: List[List[Segment]],
+                expectedArgs: Seq[String]) = {
+        val Right((selectors, args)) = ParseArgs(input)
+
+        assert(
+          selectors == expectedSelectors,
+          args == expectedArgs
+        )
+      }
+
       'rejectEmpty {
-        val Left(error) = ParseArgs(Seq.empty)
-        assert(error == "Selector cannot be empty")
+        assert(ParseArgs(Seq.empty) == Left("Selector cannot be empty"))
       }
-      'singleSelector - {
-        val Right((selectors, args)) =
-          ParseArgs(singleSelector)
-        assert(
-          selectors == List(
-            List(Label("core"), Label("compile"))
-          ),
-          args.isEmpty
-        )
-      }
-      'singleSelectorWithArgs - {
-        val Right((selectors, args)) =
-          ParseArgs(singleSelectorWithArgs)
-        assert(
-          selectors == List(
-            List(Label("application"), Label("run"))
-          ),
-          args == Seq("hello", "world")
-        )
-      }
-      'singleSelectorWithCross - {
-        val Right((selectors, args)) =
-          ParseArgs(singleSelectorWithCross)
-        assert(
-          selectors == List(
-            List(Label("bridges"),
-                 Cross(Seq("2.12.4", "jvm")),
-                 Label("compile"))),
-          args.isEmpty
-        )
-      }
-      'multiSelectorsBraceExpansion - {
-        val Right((selectors, args)) =
-          ParseArgs(multiSelectorsBraceExpansion)
-
-        assert(
-          selectors == List(
-            List(Label("core"), Label("compile")),
-            List(Label("application"), Label("compile"))
-          ),
-          args.isEmpty
-        )
-      }
-      'multiSelectorsBraceExpansionWithArgs - {
-        val Right((selectors, args)) =
-          ParseArgs(multiSelectorsBraceExpansionWithArgs)
-
-        assert(
-          selectors == List(
-            List(Label("core"), Label("run")),
-            List(Label("application"), Label("run"))
-          ),
-          args == Seq("hello", "world")
-        )
-      }
-      'multiSelectorsBraceExpansionWithCross - {
-        val Right((selectors, args)) =
-          ParseArgs(multiSelectorsBraceExpansionWithCross)
-
-        assert(
-          selectors == List(
-            List(Label("bridges"), Cross(Seq("2.12.4", "jvm")), Label("test")),
-            List(Label("bridges"), Cross(Seq("2.12.4", "jvm")), Label("jar"))
-          ),
-          args.isEmpty
-        )
-      }
-      'multiSelectorsBraceExpansionInsideCross - {
-        val Right((selectors, args)) =
-          ParseArgs(multiSelectorsBraceExpansionInsideCross)
-
-        assert(
-          selectors == List(
-            List(Label("bridges"), Cross(Seq("2.11.11")), Label("jar")),
-            List(Label("bridges"), Cross(Seq("2.11.8")), Label("jar"))
-          ),
-          args.isEmpty
-        )
-      }
+      'singleSelector - check(
+        input = Seq("core.compile"),
+        expectedSelectors = List(
+          List(Label("core"), Label("compile"))
+        ),
+        expectedArgs = Seq.empty
+      )
+      'singleSelectorWithArgs - check(
+        input = Seq("application.run", "hello", "world"),
+        expectedSelectors = List(
+          List(Label("application"), Label("run"))
+        ),
+        expectedArgs = Seq("hello", "world")
+      )
+      'singleSelectorWithCross - check(
+        input = Seq("bridges[2.12.4,jvm].compile"),
+        expectedSelectors = List(
+          List(Label("bridges"), Cross(Seq("2.12.4", "jvm")), Label("compile"))
+        ),
+        expectedArgs = Seq.empty
+      )
+      'multiSelectorsBraceExpansion - check(
+        input = Seq("--all", "{core,application}.compile"),
+        expectedSelectors = List(
+          List(Label("core"), Label("compile")),
+          List(Label("application"), Label("compile"))
+        ),
+        expectedArgs = Seq.empty
+      )
+      'multiSelectorsBraceExpansionWithArgs - check(
+        input = Seq("--all", "{core,application}.run", "--", "hello", "world"),
+        expectedSelectors = List(
+          List(Label("core"), Label("run")),
+          List(Label("application"), Label("run"))
+        ),
+        expectedArgs = Seq("hello", "world")
+      )
+      'multiSelectorsBraceExpansionWithCross - check(
+        input = Seq("--all", "bridges[2.12.4,jvm].{test,jar}"),
+        expectedSelectors = List(
+          List(Label("bridges"), Cross(Seq("2.12.4", "jvm")), Label("test")),
+          List(Label("bridges"), Cross(Seq("2.12.4", "jvm")), Label("jar"))
+        ),
+        expectedArgs = Seq.empty
+      )
+      'multiSelectorsBraceExpansionInsideCross - check(
+        input = Seq("--all", "bridges[{2.11.11,2.11.8}].jar"),
+        expectedSelectors = List(
+          List(Label("bridges"), Cross(Seq("2.11.11")), Label("jar")),
+          List(Label("bridges"), Cross(Seq("2.11.8")), Label("jar"))
+        ),
+        expectedArgs = Seq.empty
+      )
       'multiSelectorsBraceExpansionWithoutAll - {
-        val Left(error) =
-          ParseArgs(multiSelectorsBraceExpansionWithoutAll)
-
-        assert(error == "Please use --all flag to run multiple tasks")
-      }
-      'multiSelectorsWithoutAllAsSingle - { // this is how it works when we pass multiple tasks without --all flag
-        val argsList = Seq("core.compile", "application.compile")
-        val Right((selectors, args)) = ParseArgs(argsList)
-
         assert(
-          selectors == List(
-            List(Label("core"), Label("compile"))
-          ),
-          args == Seq("application.compile")
+          ParseArgs(Seq("{core,application}.compile")) == Left(
+            "Please use --all flag to run multiple tasks")
         )
       }
+      'multiSelectorsWithoutAllAsSingle - check( // this is how it works when we pass multiple tasks without --all flag
+        input = Seq("core.compile", "application.compile"),
+        expectedSelectors = List(
+          List(Label("core"), Label("compile"))
+        ),
+        expectedArgs = Seq("application.compile")
+      )
     }
   }
 
