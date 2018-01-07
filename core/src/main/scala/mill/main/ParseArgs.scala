@@ -8,17 +8,13 @@ object ParseArgs {
 
   def apply(scriptArgs: Seq[String])
     : Either[String, (List[List[Mirror.Segment]], Seq[String])] = {
-    val (selectorStrings, args, isMultiSelectors) =
-      extractSelsAndArgs(scriptArgs)
+    val (selectors, args, isMultiSelectors) = extractSelsAndArgs(scriptArgs)
     for {
-      _ <- validateSelectors(selectorStrings)
-      expandedSelectors <- if (isMultiSelectors) {
-        EitherOps
-          .sequence(selectorStrings.map(expandBraces))
-          .map(_.flatten)
-      } else {
-        Right(selectorStrings)
-      }
+      _ <- validateSelectors(selectors)
+      expandedSelectors <- EitherOps
+        .sequence(selectors.map(expandBraces))
+        .map(_.flatten)
+      _ <- validateExpanded(selectors, expandedSelectors, isMultiSelectors)
       selectors <- EitherOps.sequence(expandedSelectors.map(extractSegments))
     } yield (selectors.toList, args)
   }
@@ -43,6 +39,13 @@ object ParseArgs {
   private def validateSelectors(selectors: Seq[String]): Either[String, Unit] =
     if (selectors.isEmpty || selectors.exists(_.isEmpty))
       Left("Selector cannot be empty")
+    else Right(())
+
+  private def validateExpanded(selectors: Seq[String],
+                               expanded: Seq[String],
+                               isMulti: Boolean): Either[String, Unit] =
+    if (!isMulti && expanded.length > selectors.length)
+      Left("Please use --all flag to run multiple tasks")
     else Right(())
 
   def expandBraces(selectorString: String): Either[String, List[String]] =

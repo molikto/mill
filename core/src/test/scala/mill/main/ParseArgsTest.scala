@@ -263,7 +263,9 @@ object ParseArgsTest extends TestSuite {
           ParseArgs(singleSelectorWithCross)
         assert(
           selectors == List(
-            List(Label("bridges"), Cross(Seq("2.12.4", "jvm")), Label("compile"))),
+            List(Label("bridges"),
+                 Cross(Seq("2.12.4", "jvm")),
+                 Label("compile"))),
           args.isEmpty
         )
       }
@@ -319,7 +321,18 @@ object ParseArgsTest extends TestSuite {
         val Left(error) =
           ParseArgs(multiSelectorsBraceExpansionWithoutAll)
 
-        assert(error.contains("Parsing exception"))
+        assert(error == "Please use --all flag to run multiple tasks")
+      }
+      'multiSelectorsWithoutAllAsSingle - { // this is how it works when we pass multiple tasks without --all flag
+        val argsList = Seq("core.compile", "application.compile")
+        val Right((selectors, args)) = ParseArgs(argsList)
+
+        assert(
+          selectors == List(
+            List(Label("core"), Label("compile"))
+          ),
+          args == Seq("application.compile")
+        )
       }
     }
   }
