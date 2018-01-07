@@ -56,13 +56,13 @@ object ParseArgs {
     case class Keep(value: String) extends Fragment
     case class Expand(values: Seq[String]) extends Fragment
 
-    def unfold(segments: Seq[Fragment]): Seq[Seq[String]] = {
+    def unfold(segments: Seq[Fragment]): Seq[String] = {
       segments match {
         case Fragment.Keep(v) +: rest =>
-          unfold(rest).map(unfolded => v +: unfolded)
+          unfold(rest).map(unfolded => v + unfolded)
         case Fragment.Expand(vs) +: rest =>
-          vs.flatMap(v => unfold(rest).map(unfolded => v +: unfolded))
-        case Seq() => Seq(Seq.empty)
+          vs.flatMap(v => unfold(rest).map(unfolded => v + unfolded))
+        case Seq() => Seq("")
       }
     }
   }
@@ -80,7 +80,7 @@ object ParseArgs {
 
     val split = (containBraces | braceExpansion | other).rep
 
-    val parser = split.map(e => Fragment.unfold(e).map(_.mkString))
+    val parser = split.map(Fragment.unfold)
 
     parser.parse(input)
   }
