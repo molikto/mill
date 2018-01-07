@@ -57,39 +57,44 @@ object ParseArgs {
   private sealed trait Fragment
   private object Fragment {
     case class Keep(value: String) extends Fragment
-    case class Expand(values: Seq[String]) extends Fragment
+    case class Expand(values: Seq[Fragment]) extends Fragment
 
-    def unfold(segments: Seq[Fragment]): Seq[String] = {
-      segments match {
-        case Fragment.Keep(v) +: rest =>
-          unfold(rest).map(unfolded => v + unfolded)
-        case Fragment.Expand(vs) +: rest =>
-          vs.flatMap(v => unfold(rest).map(unfolded => v + unfolded))
+    def unfold(fragments: Seq[Fragment]): Seq[String] = {
+      fragments match {
+        case Keep(v) +: rest =>
+          for (unfolded <- unfold(rest)) yield v + unfolded
+        case Expand(vs) +: rest =>
+          for {
+            inner <- vs.map {
+              case Expand(ivs) => unfold(ivs)
+              case k: Keep     => unfold(Seq(k))
+            }
+            v <- inner
+            unfolded <- unfold(rest)
+          } yield v + unfolded
         case Seq() => Seq("")
       }
     }
   }
 
   private def parseBraceExpansion(input: String) = {
-    val braceExpansion =
-      P("{" ~/ CharsWhile(c => c != ',' && c != '}').!.rep(2, sep = ",") ~/ "}")
-        .map(Fragment.Expand)
+    val insideBraces = P((CharsWhile(c => c != ',' && c != '{' && c != '}') ~ !"{").!.map(Fragment.Keep))
 
-    val containBraces =
-      P("{" ~ CharsWhile(c => c != ',' && c != '}').rep ~ "}").!.map(
-        Fragment.Keep)
+    val withBraces = P("{" ~ CharsWhile(c => c != ',' && c != '}').rep ~ "}").!.map(Fragment.Keep)
 
     val other = P(CharsWhile(c => c != '{' && c != '}')).!.map(Fragment.Keep)
 
-    val split = (containBraces | braceExpansion | other).rep
+    def toExpand: P[Fragment] =
+      P("{" ~ (insideBraces | braceParser.rep.map(Fragment.Expand)).rep(2, sep = ",").map(Fragment.Expand) ~ "}")
 
-    val parser = split.map(Fragment.unfold)
+    def braceParser: P[Fragment] = P(withBraces | toExpand | other)
 
-    parser.parse(input)
+    val parser = braceParser.rep ~ End
+
+    parser.map(Fragment.unfold).parse(input)
   }
 
-  def extractSegments(
-      selectorString: String): Either[String, List[Segment]] =
+  def extractSegments(selectorString: String): Either[String, List[Segment]] =
     parseSelector(selectorString) match {
       case f: Parsed.Failure           => Left(s"Parsing exception ${f.msg}")
       case Parsed.Success(selector, _) => Right(selector)

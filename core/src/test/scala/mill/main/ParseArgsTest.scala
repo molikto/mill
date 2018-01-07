@@ -104,10 +104,10 @@ object ParseArgsTest extends TestSuite {
           "application.docsJar"
         )
       )
-//      'expandNested - check(
-//        "{hello,world.{cow,moo}}",
-//        List("hello", "world.cow", "world.moo")
-//      )
+      'expandNested - check(
+        "{hello,world.{cow,moo}}",
+        List("hello", "world.cow", "world.moo")
+      )
       'expandMixed - check(
         "{a,b}.{c}.{}.e",
         List("a.{c}.{}.e", "b.{c}.{}.e")
