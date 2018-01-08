@@ -1,13 +1,13 @@
 package mill.main
 
-import mill.discover.Mirror
 import mill.util.EitherOps
 import fastparse.all._
+import mill.define.Segment
 
 object ParseArgs {
 
   def apply(scriptArgs: Seq[String])
-    : Either[String, (List[List[Mirror.Segment]], Seq[String])] = {
+    : Either[String, (List[List[Segment]], Seq[String])] = {
     val (selectors, args, isMultiSelectors) = extractSelsAndArgs(scriptArgs)
     for {
       _ <- validateSelectors(selectors)
@@ -89,7 +89,7 @@ object ParseArgs {
   }
 
   def extractSegments(
-      selectorString: String): Either[String, List[Mirror.Segment]] =
+      selectorString: String): Either[String, List[Segment]] =
     parseSelector(selectorString) match {
       case f: Parsed.Failure           => Left(s"Parsing exception ${f.msg}")
       case Parsed.Success(selector, _) => Right(selector)
@@ -98,13 +98,11 @@ object ParseArgs {
   private def parseSelector(input: String) = {
     val segment =
       P(CharsWhileIn(('a' to 'z') ++ ('A' to 'Z') ++ ('0' to '9')).!).map(
-        Mirror.Segment.Label
+        Segment.Label
       )
     val crossSegment =
       P("[" ~ CharsWhile(c => c != ',' && c != ']').!.rep(1, sep = ",") ~ "]")
-        .map(
-          Mirror.Segment.Cross
-        )
+        .map(Segment.Cross)
     val query = P(segment ~ ("." ~ segment | crossSegment).rep ~ End).map {
       case (h, rest) => h :: rest.toList
     }

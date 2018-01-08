@@ -1,7 +1,7 @@
 package mill.main
 
-import mill.discover.Mirror.Segment
-import mill.discover.Mirror.Segment.{Cross, Label}
+import mill.define.Segment
+import mill.define.Segment.{Cross, Label}
 import utest._
 
 object ParseArgsTest extends TestSuite {
@@ -21,7 +21,10 @@ object ParseArgsTest extends TestSuite {
         )
       }
 
-      'empty - check(Seq.empty, Seq.empty, Seq.empty, false)
+      'empty - check(input = Seq.empty,
+                     expectedSelectors = Seq.empty,
+                     expectedArgs = Seq.empty,
+                     expectedIsMulti = false)
       'singleSelector - check(
         input = Seq("core.compile"),
         expectedSelectors = Seq("core.compile"),

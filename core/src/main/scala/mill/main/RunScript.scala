@@ -1,6 +1,5 @@
 package mill.main
 
-import java.io.PrintStream
 import java.nio.file.NoSuchFileException
 
 import ammonite.interp.Interpreter
@@ -10,9 +9,9 @@ import ammonite.util.{Name, Res, Util}
 import mill.{PathRef, define}
 import mill.define.Task
 import mill.define.Segment
-import mill.discover.{Discovered, Mirror}
+import mill.discover.Discovered
 import mill.eval.{Evaluator, Result}
-import mill.util.{EitherOps, Logger, OSet, PrintLogger}
+import mill.util.{EitherOps, Logger, OSet}
 import upickle.Js
 
 /**
