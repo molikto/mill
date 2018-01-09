@@ -78,15 +78,21 @@ object ParseArgs {
   }
 
   private def parseBraceExpansion(input: String) = {
-    val insideBraces = P((CharsWhile(c => c != ',' && c != '{' && c != '}') ~ !"{").!.map(Fragment.Keep))
+    val bracesBase = CharsWhile(c => c != ',' && c != '{' && c != '}').!.map(Fragment.Keep)
+    val insideBraces = P(bracesBase ~ !"{")
 
-    val withBraces = P("{" ~ CharsWhile(c => c != ',' && c != '}').rep ~ "}").!.map(Fragment.Keep)
+    val withBraces = P("{" ~ CharsWhile(c => c != ',' && c != '}').rep ~ "}").!.map(Fragment.Keep) // TODO: try to remove
 
     val other = P(CharsWhile(c => c != '{' && c != '}')).!.map(Fragment.Keep)
 
-    def expandRecur: P[Fragment] = (other.? ~ toExpand).map { case (h, t) => Fragment.Expand(h.toSeq ++ Seq(t))}
+    def expandRecur: P[Fragment] =
+      (bracesBase.? ~ toExpand ~ bracesBase.?).map {
+        case (a, b, c) =>
+          Fragment.Expand(a.toSeq ++ Seq(b) ++ c.toSeq)
+      }
 
-    def toExpand: P[Fragment] = P("{" ~ (insideBraces | expandRecur).rep(2, sep = ",").map(Fragment.Expand) ~ "}")
+    def toExpand: P[Fragment] =
+      P("{" ~ (insideBraces | expandRecur).rep(2, sep = ",").map(Fragment.Expand) ~ "}")
 
     def braceParser = P(withBraces | toExpand | other)
 
