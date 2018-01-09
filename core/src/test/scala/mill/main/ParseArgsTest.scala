@@ -109,10 +109,11 @@ object ParseArgsTest extends TestSuite {
               List("hello", "world.cow", "world.moo"))
         check("{a,b{c,d}}", List("a", "bc", "bd"))
         check("{a,b{c,d{e,f}}}", List("a", "bc", "bde", "bdf"))
+        check("{a{b,c},d}", List("ab", "ac", "d"))
+        check("{a{b,c},d{e,f}}", List("ab", "ac", "de", "df"))
+        check("{a,b{c,d},e{f,g}}", List("a", "bc", "bd", "ef", "eg"))
 
-        check("{a{b,c},d}", List("ab", "ac", "d")) // fails
-        check("{a{b,c},d{e,f}}", List("ab", "ac", "de", "df")) // fails
-        check("{a,b{c,d},e{f,g}}", List("a", "bc", "bd", "ef", "eg")) // fails
+        check("{a,{b,c}d}", List("a", "bd", "cd")) // fails
       }
       'expandMixed - check(
         "{a,b}.{c}.{}.e",

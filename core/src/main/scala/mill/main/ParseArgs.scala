@@ -84,10 +84,11 @@ object ParseArgs {
 
     val other = P(CharsWhile(c => c != '{' && c != '}')).!.map(Fragment.Keep)
 
-    def toExpand: P[Fragment] =
-      P("{" ~ (insideBraces | braceParser.rep.map(Fragment.Expand)).rep(2, sep = ",").map(Fragment.Expand) ~ "}")
+    def expandRecur: P[Fragment] = (other.? ~ toExpand).map { case (h, t) => Fragment.Expand(h.toSeq ++ Seq(t))}
 
-    def braceParser: P[Fragment] = P(withBraces | toExpand | other)
+    def toExpand: P[Fragment] = P("{" ~ (insideBraces | expandRecur).rep(2, sep = ",").map(Fragment.Expand) ~ "}")
+
+    def braceParser = P(withBraces | toExpand | other)
 
     val parser = braceParser.rep ~ End
 
